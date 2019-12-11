@@ -37,9 +37,9 @@ func bruteforceAnswer(p intcode.Program, expected int) int {
 
 func calcAnswer(p intcode.Program, noun int, verb int) int {
 	p.Reset()
-	p.SetInput(noun, verb)
+	p.SetNounVerb(noun, verb)
 	p.Run()
-	return p.GetOutput()
+	return p.GetOutputRegister()
 }
 
 func readInput(filename string) string {
