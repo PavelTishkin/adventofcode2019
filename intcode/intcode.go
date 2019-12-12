@@ -27,6 +27,10 @@ var instructionLength = map[int]int{
 	2:  3,
 	3:  1,
 	4:  1,
+	5:  2,
+	6:  2,
+	7:  3,
+	8:  3,
 	99: 0,
 }
 
@@ -76,6 +80,14 @@ func (p *Program) Run() {
 			ip = storeOp(p, ip, inst)
 		case 4:
 			ip = loadOp(p, ip, inst)
+		case 5:
+			ip = jnzOp(p, ip, inst)
+		case 6:
+			ip = jzOp(p, ip, inst)
+		case 7:
+			ip = ltOp(p, ip, inst)
+		case 8:
+			ip = eqOp(p, ip, inst)
 		}
 	}
 }
@@ -174,6 +186,96 @@ func loadOp(p *Program, ip int, inst instruction) int {
 	p.output = append(p.output, p.memory[loadAddr])
 
 	return ip + 2
+}
+
+func jnzOp(p *Program, ip int, inst instruction) int {
+	var cmpAddr, jmpAddr int
+	if inst.modeMask[0] == 1 {
+		cmpAddr = ip + 1
+	} else {
+		cmpAddr = p.memory[ip+1]
+	}
+	if inst.modeMask[1] == 1 {
+		jmpAddr = ip + 2
+	} else {
+		jmpAddr = p.memory[ip+2]
+	}
+
+	if p.memory[cmpAddr] != 0 {
+		return p.memory[jmpAddr]
+	}
+	return ip + 3
+}
+
+func jzOp(p *Program, ip int, inst instruction) int {
+	var cmpAddr, jmpAddr int
+	if inst.modeMask[0] == 1 {
+		cmpAddr = ip + 1
+	} else {
+		cmpAddr = p.memory[ip+1]
+	}
+	if inst.modeMask[1] == 1 {
+		jmpAddr = ip + 2
+	} else {
+		jmpAddr = p.memory[ip+2]
+	}
+
+	if p.memory[cmpAddr] == 0 {
+		return p.memory[jmpAddr]
+	}
+	return ip + 3
+}
+
+func ltOp(p *Program, ip int, inst instruction) int {
+	var cmpAddr1, cmpAddr2, storeAddr int
+	if inst.modeMask[0] == 1 {
+		cmpAddr1 = ip + 1
+	} else {
+		cmpAddr1 = p.memory[ip+1]
+	}
+	if inst.modeMask[1] == 1 {
+		cmpAddr2 = ip + 2
+	} else {
+		cmpAddr2 = p.memory[ip+2]
+	}
+	if inst.modeMask[2] == 1 {
+		storeAddr = ip + 3
+	} else {
+		storeAddr = p.memory[ip+3]
+	}
+
+	if p.memory[cmpAddr1] < p.memory[cmpAddr2] {
+		p.memory[storeAddr] = 1
+	} else {
+		p.memory[storeAddr] = 0
+	}
+	return ip + 4
+}
+
+func eqOp(p *Program, ip int, inst instruction) int {
+	var cmpAddr1, cmpAddr2, storeAddr int
+	if inst.modeMask[0] == 1 {
+		cmpAddr1 = ip + 1
+	} else {
+		cmpAddr1 = p.memory[ip+1]
+	}
+	if inst.modeMask[1] == 1 {
+		cmpAddr2 = ip + 2
+	} else {
+		cmpAddr2 = p.memory[ip+2]
+	}
+	if inst.modeMask[2] == 1 {
+		storeAddr = ip + 3
+	} else {
+		storeAddr = p.memory[ip+3]
+	}
+
+	if p.memory[cmpAddr1] == p.memory[cmpAddr2] {
+		p.memory[storeAddr] = 1
+	} else {
+		p.memory[storeAddr] = 0
+	}
+	return ip + 4
 }
 
 /*

@@ -152,7 +152,7 @@ func TestLoadOp(t *testing.T) {
 	got = loadOp(&p, got, inst)
 	var expected = []int{20, 25}
 	if p.convertMemoryToString() != "4,5,4,6,99,20,25" {
-		t.Errorf("addOp = %s; want 4,5,4,6,99,20,25", p.convertMemoryToString())
+		t.Errorf("loadOp = %s; want 4,5,4,6,99,20,25", p.convertMemoryToString())
 	}
 	if got != 4 {
 		t.Errorf("ip = %d; want 2", got)
@@ -168,13 +168,105 @@ func TestLoadOp(t *testing.T) {
 	got = loadOp(&p, got, inst)
 	expected = []int{5, 6}
 	if p.convertMemoryToString() != "104,5,104,6,99,20,25" {
-		t.Errorf("addOp = %s; want 104,5,104,6,99,20,25", p.convertMemoryToString())
+		t.Errorf("loadOp = %s; want 104,5,104,6,99,20,25", p.convertMemoryToString())
 	}
 	if got != 4 {
 		t.Errorf("ip = %d; want 2", got)
 	}
 	if !slicesEqual(p.output, expected) {
 		t.Errorf("p.output = %v; want [5 6]", p.output)
+	}
+}
+
+func TestJnzOp(t *testing.T) {
+	var p = Program{}
+	p.InitMemory("5,4,5,99,1,4")
+	var inst = parseInstruction(p.memory[0])
+	var got = jnzOp(&p, 0, inst)
+	if p.convertMemoryToString() != "5,4,5,99,1,4" {
+		t.Errorf("p.memory = %s; want 5,4,5,99,1,4", p.convertMemoryToString())
+	}
+	if got != 4 {
+		t.Errorf("ip = %d; want 4", got)
+	}
+
+	p.Reset()
+	p.InitMemory("5,4,5,99,0,4")
+	inst = parseInstruction(p.memory[0])
+	got = jnzOp(&p, 0, inst)
+	if p.convertMemoryToString() != "5,4,5,99,0,4" {
+		t.Errorf("p.memory = %s; want 5,4,5,99,0,4", p.convertMemoryToString())
+	}
+	if got != 3 {
+		t.Errorf("ip = %d; want 3", got)
+	}
+
+	p.Reset()
+	p.InitMemory("1105,1,4,99,0")
+	inst = parseInstruction(p.memory[0])
+	got = jnzOp(&p, 0, inst)
+	if p.convertMemoryToString() != "1105,1,4,99,0" {
+		t.Errorf("p.memory = %s; want 1105,1,4,99,0", p.convertMemoryToString())
+	}
+	if got != 4 {
+		t.Errorf("ip = %d; want 4", got)
+	}
+
+	p.Reset()
+	p.InitMemory("1105,0,4,99,0")
+	inst = parseInstruction(p.memory[0])
+	got = jnzOp(&p, 0, inst)
+	if p.convertMemoryToString() != "1105,0,4,99,0" {
+		t.Errorf("p.memory = %s; want 1105,0,4,99,0", p.convertMemoryToString())
+	}
+	if got != 3 {
+		t.Errorf("ip = %d; want 3", got)
+	}
+}
+
+func TestJzOp(t *testing.T) {
+	var p = Program{}
+	p.InitMemory("6,4,5,99,1,4")
+	var inst = parseInstruction(p.memory[0])
+	var got = jzOp(&p, 0, inst)
+	if p.convertMemoryToString() != "6,4,5,99,1,4" {
+		t.Errorf("p.memory = %s; want 6,4,5,99,1,4", p.convertMemoryToString())
+	}
+	if got != 3 {
+		t.Errorf("ip = %d; want 3", got)
+	}
+
+	p.Reset()
+	p.InitMemory("6,4,5,99,0,4")
+	inst = parseInstruction(p.memory[0])
+	got = jzOp(&p, 0, inst)
+	if p.convertMemoryToString() != "6,4,5,99,0,4" {
+		t.Errorf("p.memory = %s; want 6,4,5,99,0,4", p.convertMemoryToString())
+	}
+	if got != 4 {
+		t.Errorf("ip = %d; want 4", got)
+	}
+
+	p.Reset()
+	p.InitMemory("1106,1,4,99,0")
+	inst = parseInstruction(p.memory[0])
+	got = jzOp(&p, 0, inst)
+	if p.convertMemoryToString() != "1106,1,4,99,0" {
+		t.Errorf("p.memory = %s; want 1106,1,4,99,0", p.convertMemoryToString())
+	}
+	if got != 3 {
+		t.Errorf("ip = %d; want 3", got)
+	}
+
+	p.Reset()
+	p.InitMemory("1106,0,4,99,0")
+	inst = parseInstruction(p.memory[0])
+	got = jzOp(&p, 0, inst)
+	if p.convertMemoryToString() != "1106,0,4,99,0" {
+		t.Errorf("p.memory = %s; want 1106,0,4,99,0", p.convertMemoryToString())
+	}
+	if got != 4 {
+		t.Errorf("ip = %d; want 4", got)
 	}
 }
 

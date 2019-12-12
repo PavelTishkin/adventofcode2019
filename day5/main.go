@@ -14,13 +14,21 @@ func main() {
 
 	var p = intcode.Program{}
 	p.InitMemory(input)
-	fmt.Printf("Part 1: %d\n", calcAnswer(p))
-	//fmt.Printf("Part 2: %d\n", bruteforceAnswer(p, int(expected)))
+	fmt.Printf("Part 1: %d\n", calcAnswer1(p))
+	fmt.Printf("Part 2: %d\n", calcAnswer2(p))
 }
 
-func calcAnswer(p intcode.Program) int {
+func calcAnswer1(p intcode.Program) int {
 	p.Reset()
 	p.PushInput(1)
+	p.Run()
+	var outArr = p.GetOutput()
+	return outArr[len(outArr)-1]
+}
+
+func calcAnswer2(p intcode.Program) int {
+	p.Reset()
+	p.PushInput(5)
 	p.Run()
 	var outArr = p.GetOutput()
 	return outArr[len(outArr)-1]
