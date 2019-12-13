@@ -4,6 +4,14 @@ import (
 	"testing"
 )
 
+func TestCalctransferSteps(t *testing.T) {
+	skyMap := createMap([]string{"COM)B", "B)C", "C)D", "D)E", "E)F", "B)G", "G)H", "D)I", "E)J", "J)K", "K)L", "K)YOU", "I)SAN"})
+	got := calcTransferSteps(skyMap["YOU"], skyMap["SAN"], skyMap["COM"])
+	if got != 4 {
+		t.Errorf("celBody.depCount = %v; want 4", 4)
+	}
+}
+
 func TestCalcDependencies(t *testing.T) {
 	skyMap := createMap([]string{"A)B", "B)C", "B)D"})
 	calcDependencies(skyMap["A"])
