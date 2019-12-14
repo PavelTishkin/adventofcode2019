@@ -15,6 +15,9 @@ type Program struct {
 	memory     []int
 	input      []int
 	output     []int
+	ip         int
+	isRunning  bool
+	isPaused   bool
 }
 
 type instruction struct {
@@ -56,40 +59,72 @@ func (p *Program) InitMemory(input string) {
 	p.memory = make([]int, len(intArray))
 	copy(p.memoryOrig, intArray)
 	copy(p.memory, intArray)
+	p.ip = 0
+	p.isRunning = true
+	p.isPaused = false
+}
+
+/*
+CopyMemory initialized program with existing copy of memory passed in as array
+*/
+func (p *Program) CopyMemory(initMemory []int) {
+	p.memoryOrig = make([]int, len(initMemory))
+	copy(p.memoryOrig, initMemory)
+	p.Reset()
+}
+
+/*
+GetMemory returns current memory of program
+*/
+func (p *Program) GetMemory() []int {
+	return p.memory
 }
 
 /*
 Run perfroms main computation of a program
 */
 func (p *Program) Run() {
-	var isRunning bool = true
-	var ip int = 0
 	var inst instruction
 
-	for isRunning {
-		inst = parseInstruction(p.memory[ip])
+	for p.isRunning && !p.isPaused {
+		inst = parseInstruction(p.memory[p.ip])
 
 		switch inst.opcode {
 		case 99:
-			isRunning = false
+			p.isRunning = false
 		case 1:
-			ip = addOp(p, ip, inst)
+			p.ip = addOp(p, p.ip, inst)
 		case 2:
-			ip = mulOp(p, ip, inst)
+			p.ip = mulOp(p, p.ip, inst)
 		case 3:
-			ip = storeOp(p, ip, inst)
+			p.ip = storeOp(p, p.ip, inst)
 		case 4:
-			ip = loadOp(p, ip, inst)
+			p.ip = loadOp(p, p.ip, inst)
 		case 5:
-			ip = jnzOp(p, ip, inst)
+			p.ip = jnzOp(p, p.ip, inst)
 		case 6:
-			ip = jzOp(p, ip, inst)
+			p.ip = jzOp(p, p.ip, inst)
 		case 7:
-			ip = ltOp(p, ip, inst)
+			p.ip = ltOp(p, p.ip, inst)
 		case 8:
-			ip = eqOp(p, ip, inst)
+			p.ip = eqOp(p, p.ip, inst)
 		}
 	}
+}
+
+/*
+IsRunning returns true if the program is still executing
+*/
+func (p *Program) IsRunning() bool {
+	return p.isRunning
+}
+
+/*
+Continue resumes execution of program
+*/
+func (p *Program) Continue() {
+	p.isPaused = false
+	p.Run()
 }
 
 /*
@@ -163,6 +198,12 @@ func mulOp(p *Program, ip int, inst instruction) int {
 
 func storeOp(p *Program, ip int, inst instruction) int {
 	var storeAddr int
+
+	if len(p.input) == 0 {
+		p.isPaused = true
+		return ip
+	}
+
 	if inst.modeMask[0] == 1 {
 		storeAddr = ip + 1
 	} else {
@@ -331,4 +372,7 @@ func (p *Program) Reset() {
 	copy(p.memory, p.memoryOrig)
 	p.input = []int{}
 	p.output = []int{}
+	p.ip = 0
+	p.isRunning = true
+	p.isPaused = false
 }

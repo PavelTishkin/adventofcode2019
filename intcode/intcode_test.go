@@ -197,6 +197,29 @@ func TestRun(t *testing.T) {
 	}
 }
 
+func TestContinue(t *testing.T) {
+	var p = Program{}
+	p.InitMemory("3,11,3,12,1,11,12,13,4,13,99,0,0,0")
+	p.PushInput(7)
+	p.Run()
+	if !p.isPaused {
+		t.Errorf("p.isPaused = %t; want true", p.isPaused)
+	}
+	p.PushInput(2)
+	p.Continue()
+	if p.isPaused {
+		t.Errorf("p.isPaused = %t; want false", p.isPaused)
+	}
+	got := p.PopOutput()
+	expectedMem := []int{3, 11, 3, 12, 1, 11, 12, 13, 4, 13, 99, 7, 2, 9}
+	if !slicesEqual(expectedMem, p.memory) {
+		t.Errorf("p.memory = %v; want %v", p.memory, expectedMem)
+	}
+	if got != 9 {
+		t.Errorf("p.PopOutput = %d; want 9", got)
+	}
+}
+
 func TestAddOp(t *testing.T) {
 	var p = Program{}
 	p.InitMemory("1,4,4,5,99,0")
