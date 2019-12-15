@@ -11,11 +11,12 @@ import (
 Program is a structure for running intcode compiler
 */
 type Program struct {
-	memoryOrig []int
-	memory     []int
-	input      []int
-	output     []int
+	memoryOrig []int64
+	memory     []int64
+	input      []int64
+	output     []int64
 	ip         int
+	relBase    int
 	isRunning  bool
 	isPaused   bool
 }
@@ -34,6 +35,7 @@ var instructionLength = map[int]int{
 	6:  2,
 	7:  3,
 	8:  3,
+	9:  1,
 	99: 0,
 }
 
@@ -43,23 +45,26 @@ This will reset initial memory of an intcode program
 */
 func (p *Program) InitMemory(input string) {
 	strArray := strings.Split(input, ",")
-	var intArray []int
+	var intArray []int64
 
 	for _, strItem := range strArray {
-		intItem, err := strconv.ParseInt(strItem, 10, 32)
+		intItem, err := strconv.ParseInt(strItem, 10, 64)
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		intArray = append(intArray, int(intItem))
+		intArray = append(intArray, intItem)
 	}
 
-	p.memoryOrig = make([]int, len(intArray))
-	p.memory = make([]int, len(intArray))
+	p.memoryOrig = make([]int64, len(intArray))
+	p.memory = make([]int64, len(intArray))
 	copy(p.memoryOrig, intArray)
 	copy(p.memory, intArray)
 	p.ip = 0
+	p.relBase = 0
+	p.input = []int64{}
+	p.output = []int64{}
 	p.isRunning = true
 	p.isPaused = false
 }
@@ -67,8 +72,8 @@ func (p *Program) InitMemory(input string) {
 /*
 CopyMemory initialized program with existing copy of memory passed in as array
 */
-func (p *Program) CopyMemory(initMemory []int) {
-	p.memoryOrig = make([]int, len(initMemory))
+func (p *Program) CopyMemory(initMemory []int64) {
+	p.memoryOrig = make([]int64, len(initMemory))
 	copy(p.memoryOrig, initMemory)
 	p.Reset()
 }
@@ -76,7 +81,7 @@ func (p *Program) CopyMemory(initMemory []int) {
 /*
 GetMemory returns current memory of program
 */
-func (p *Program) GetMemory() []int {
+func (p *Program) GetMemory() []int64 {
 	return p.memory
 }
 
@@ -87,7 +92,7 @@ func (p *Program) Run() {
 	var inst instruction
 
 	for p.isRunning && !p.isPaused {
-		inst = parseInstruction(p.memory[p.ip])
+		inst = parseInstruction(int(p.memory[p.ip]))
 
 		switch inst.opcode {
 		case 99:
@@ -108,6 +113,8 @@ func (p *Program) Run() {
 			p.ip = ltOp(p, p.ip, inst)
 		case 8:
 			p.ip = eqOp(p, p.ip, inst)
+		case 9:
+			p.ip = addRelBaseOp(p, p.ip, inst)
 		}
 	}
 }
@@ -153,62 +160,31 @@ func parseInstruction(instValue int) instruction {
 }
 
 func addOp(p *Program, ip int, inst instruction) int {
-	var par1Addr, par2Addr, outAddr int
-	if inst.modeMask[0] == 1 {
-		par1Addr = ip + 1
-	} else {
-		par1Addr = p.memory[ip+1]
-	}
-	if inst.modeMask[1] == 1 {
-		par2Addr = ip + 2
-	} else {
-		par2Addr = p.memory[ip+2]
-	}
-	if inst.modeMask[2] == 1 {
-		outAddr = ip + 3
-	} else {
-		outAddr = p.memory[ip+3]
-	}
+	par1Addr := getAddrByMode(p, ip+1, inst.modeMask[0])
+	par2Addr := getAddrByMode(p, ip+2, inst.modeMask[1])
+	outAddr := getAddrByMode(p, ip+3, inst.modeMask[2])
 
 	p.memory[outAddr] = p.memory[par1Addr] + p.memory[par2Addr]
 	return ip + instructionLength[inst.opcode] + 1
 }
 
 func mulOp(p *Program, ip int, inst instruction) int {
-	var par1Addr, par2Addr, outAddr int
-	if inst.modeMask[0] == 1 {
-		par1Addr = ip + 1
-	} else {
-		par1Addr = p.memory[ip+1]
-	}
-	if inst.modeMask[1] == 1 {
-		par2Addr = ip + 2
-	} else {
-		par2Addr = p.memory[ip+2]
-	}
-	if inst.modeMask[2] == 1 {
-		outAddr = ip + 3
-	} else {
-		outAddr = p.memory[ip+3]
-	}
+	par1Addr := getAddrByMode(p, ip+1, inst.modeMask[0])
+	par2Addr := getAddrByMode(p, ip+2, inst.modeMask[1])
+	outAddr := getAddrByMode(p, ip+3, inst.modeMask[2])
 
 	p.memory[outAddr] = p.memory[par1Addr] * p.memory[par2Addr]
 	return ip + instructionLength[inst.opcode] + 1
 }
 
 func storeOp(p *Program, ip int, inst instruction) int {
-	var storeAddr int
 
 	if len(p.input) == 0 {
 		p.isPaused = true
 		return ip
 	}
 
-	if inst.modeMask[0] == 1 {
-		storeAddr = ip + 1
-	} else {
-		storeAddr = p.memory[ip+1]
-	}
+	storeAddr := getAddrByMode(p, ip+1, inst.modeMask[0])
 
 	p.memory[storeAddr] = p.input[0]
 	p.input = p.input[1:]
@@ -217,12 +193,7 @@ func storeOp(p *Program, ip int, inst instruction) int {
 }
 
 func loadOp(p *Program, ip int, inst instruction) int {
-	var loadAddr int
-	if inst.modeMask[0] == 1 {
-		loadAddr = ip + 1
-	} else {
-		loadAddr = p.memory[ip+1]
-	}
+	loadAddr := getAddrByMode(p, ip+1, inst.modeMask[0])
 
 	p.output = append(p.output, p.memory[loadAddr])
 
@@ -230,60 +201,29 @@ func loadOp(p *Program, ip int, inst instruction) int {
 }
 
 func jnzOp(p *Program, ip int, inst instruction) int {
-	var cmpAddr, jmpAddr int
-	if inst.modeMask[0] == 1 {
-		cmpAddr = ip + 1
-	} else {
-		cmpAddr = p.memory[ip+1]
-	}
-	if inst.modeMask[1] == 1 {
-		jmpAddr = ip + 2
-	} else {
-		jmpAddr = p.memory[ip+2]
-	}
+	cmpAddr := getAddrByMode(p, ip+1, inst.modeMask[0])
+	jmpAddr := getAddrByMode(p, ip+2, inst.modeMask[1])
 
 	if p.memory[cmpAddr] != 0 {
-		return p.memory[jmpAddr]
+		return int(p.memory[jmpAddr])
 	}
 	return ip + 3
 }
 
 func jzOp(p *Program, ip int, inst instruction) int {
-	var cmpAddr, jmpAddr int
-	if inst.modeMask[0] == 1 {
-		cmpAddr = ip + 1
-	} else {
-		cmpAddr = p.memory[ip+1]
-	}
-	if inst.modeMask[1] == 1 {
-		jmpAddr = ip + 2
-	} else {
-		jmpAddr = p.memory[ip+2]
-	}
+	cmpAddr := getAddrByMode(p, ip+1, inst.modeMask[0])
+	jmpAddr := getAddrByMode(p, ip+2, inst.modeMask[1])
 
 	if p.memory[cmpAddr] == 0 {
-		return p.memory[jmpAddr]
+		return int(p.memory[jmpAddr])
 	}
 	return ip + 3
 }
 
 func ltOp(p *Program, ip int, inst instruction) int {
-	var cmpAddr1, cmpAddr2, storeAddr int
-	if inst.modeMask[0] == 1 {
-		cmpAddr1 = ip + 1
-	} else {
-		cmpAddr1 = p.memory[ip+1]
-	}
-	if inst.modeMask[1] == 1 {
-		cmpAddr2 = ip + 2
-	} else {
-		cmpAddr2 = p.memory[ip+2]
-	}
-	if inst.modeMask[2] == 1 {
-		storeAddr = ip + 3
-	} else {
-		storeAddr = p.memory[ip+3]
-	}
+	cmpAddr1 := getAddrByMode(p, ip+1, inst.modeMask[0])
+	cmpAddr2 := getAddrByMode(p, ip+2, inst.modeMask[1])
+	storeAddr := getAddrByMode(p, ip+3, inst.modeMask[2])
 
 	if p.memory[cmpAddr1] < p.memory[cmpAddr2] {
 		p.memory[storeAddr] = 1
@@ -294,22 +234,9 @@ func ltOp(p *Program, ip int, inst instruction) int {
 }
 
 func eqOp(p *Program, ip int, inst instruction) int {
-	var cmpAddr1, cmpAddr2, storeAddr int
-	if inst.modeMask[0] == 1 {
-		cmpAddr1 = ip + 1
-	} else {
-		cmpAddr1 = p.memory[ip+1]
-	}
-	if inst.modeMask[1] == 1 {
-		cmpAddr2 = ip + 2
-	} else {
-		cmpAddr2 = p.memory[ip+2]
-	}
-	if inst.modeMask[2] == 1 {
-		storeAddr = ip + 3
-	} else {
-		storeAddr = p.memory[ip+3]
-	}
+	cmpAddr1 := getAddrByMode(p, ip+1, inst.modeMask[0])
+	cmpAddr2 := getAddrByMode(p, ip+2, inst.modeMask[1])
+	storeAddr := getAddrByMode(p, ip+3, inst.modeMask[2])
 
 	if p.memory[cmpAddr1] == p.memory[cmpAddr2] {
 		p.memory[storeAddr] = 1
@@ -319,31 +246,60 @@ func eqOp(p *Program, ip int, inst instruction) int {
 	return ip + 4
 }
 
+func addRelBaseOp(p *Program, ip int, inst instruction) int {
+	relBaseAddr := getAddrByMode(p, ip+1, inst.modeMask[0])
+
+	p.relBase += int(p.memory[relBaseAddr])
+
+	return ip + 2
+}
+
+func getAddrByMode(p *Program, ip int, modeMask int) int {
+	if modeMask == 1 {
+		return ip
+	} else if modeMask == 2 {
+		retAddr := p.relBase + int(p.memory[ip])
+		p.expandMemory(retAddr + 1)
+		return retAddr
+	}
+	retAddr := int(p.memory[ip])
+	p.expandMemory(retAddr + 1)
+	return retAddr
+}
+
+func (p *Program) expandMemory(newSize int) {
+	if len(p.memory) < newSize {
+		tmpMemory := make([]int64, newSize)
+		copy(tmpMemory, p.memory)
+		p.memory = tmpMemory
+	}
+}
+
 /*
 SetInput sets input array of a program
 */
-func (p *Program) SetInput(input []int) {
+func (p *Program) SetInput(input []int64) {
 	p.input = input
 }
 
 /*
 PushInput pushed additional input on to the end of input array
 */
-func (p *Program) PushInput(inputVal int) {
+func (p *Program) PushInput(inputVal int64) {
 	p.input = append(p.input, inputVal)
 }
 
 /*
 GetOutput returns output array of a program
 */
-func (p Program) GetOutput() []int {
+func (p Program) GetOutput() []int64 {
 	return p.output
 }
 
 /*
 PopOutput pops output value from front of output array
 */
-func (p *Program) PopOutput() int {
+func (p *Program) PopOutput() int64 {
 	var outVal = p.output[0]
 	p.output = p.output[1:]
 	return outVal
@@ -352,7 +308,7 @@ func (p *Program) PopOutput() int {
 /*
 SetNounVerb sets noun and verb of a programs memory
 */
-func (p *Program) SetNounVerb(noun int, verb int) {
+func (p *Program) SetNounVerb(noun int64, verb int64) {
 	p.memory[1] = noun
 	p.memory[2] = verb
 }
@@ -360,7 +316,7 @@ func (p *Program) SetNounVerb(noun int, verb int) {
 /*
 GetOutputRegister returns output value of a program based on first entry in memory
 */
-func (p Program) GetOutputRegister() int {
+func (p Program) GetOutputRegister() int64 {
 	return p.memory[0]
 }
 
@@ -368,11 +324,12 @@ func (p Program) GetOutputRegister() int {
 Reset resets memory to original state
 */
 func (p *Program) Reset() {
-	p.memory = make([]int, len(p.memoryOrig))
+	p.memory = make([]int64, len(p.memoryOrig))
 	copy(p.memory, p.memoryOrig)
-	p.input = []int{}
-	p.output = []int{}
+	p.input = []int64{}
+	p.output = []int64{}
 	p.ip = 0
+	p.relBase = 0
 	p.isRunning = true
 	p.isPaused = false
 }

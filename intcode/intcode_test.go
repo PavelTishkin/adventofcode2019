@@ -9,7 +9,7 @@ import (
 func TestInitMemory(t *testing.T) {
 	var p = Program{}
 	p.InitMemory("1,2,3")
-	var expected = []int{1, 2, 3}
+	var expected = []int64{1, 2, 3}
 	if !slicesEqual(p.memory, expected) {
 		t.Errorf("p.memory = %v; want {1, 2, 3}", p.memory)
 	}
@@ -17,7 +17,7 @@ func TestInitMemory(t *testing.T) {
 		t.Errorf("p.memoryOrig = %v; want {1, 2, 3}", p.memoryOrig)
 	}
 	p.InitMemory("4,5")
-	expected = []int{4, 5}
+	expected = []int64{4, 5}
 	if !slicesEqual(p.memory, expected) {
 		t.Errorf("p.memory = %v; want {4, 5}", p.memory)
 	}
@@ -25,7 +25,7 @@ func TestInitMemory(t *testing.T) {
 		t.Errorf("p.memoryOrig = %v; want {4, 5}", p.memoryOrig)
 	}
 	p.InitMemory("6,7,8,9")
-	expected = []int{6, 7, 8, 9}
+	expected = []int64{6, 7, 8, 9}
 	if !slicesEqual(p.memory, expected) {
 		t.Errorf("p.memory = %v; want {6, 7, 8, 9}", p.memory)
 	}
@@ -195,6 +195,27 @@ func TestRun(t *testing.T) {
 	if gotOutput != 1001 {
 		t.Errorf("p.output = %d; want 1001", gotOutput)
 	}
+
+	p.InitMemory("109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99")
+	p.Run()
+	outputArr := p.GetOutput()
+	if !slicesEqual(outputArr, p.memoryOrig) {
+		t.Errorf("p.GetOutput = %v; want %v", outputArr, p.memoryOrig)
+	}
+
+	p.InitMemory("1102,34915192,34915192,7,4,7,99,0")
+	p.Run()
+	gotOutput = p.PopOutput()
+	if len(strconv.FormatInt(gotOutput, 10)) != 16 {
+		t.Errorf("output length = %d; want 16", len(strconv.FormatInt(gotOutput, 10)))
+	}
+
+	p.InitMemory("104,1125899906842624,99")
+	p.Run()
+	gotOutput = p.PopOutput()
+	if gotOutput != 1125899906842624 {
+		t.Errorf("p.PopOutput = %d; want 1125899906842624", gotOutput)
+	}
 }
 
 func TestContinue(t *testing.T) {
@@ -211,7 +232,7 @@ func TestContinue(t *testing.T) {
 		t.Errorf("p.isPaused = %t; want false", p.isPaused)
 	}
 	got := p.PopOutput()
-	expectedMem := []int{3, 11, 3, 12, 1, 11, 12, 13, 4, 13, 99, 7, 2, 9}
+	expectedMem := []int64{3, 11, 3, 12, 1, 11, 12, 13, 4, 13, 99, 7, 2, 9}
 	if !slicesEqual(expectedMem, p.memory) {
 		t.Errorf("p.memory = %v; want %v", p.memory, expectedMem)
 	}
@@ -223,7 +244,7 @@ func TestContinue(t *testing.T) {
 func TestAddOp(t *testing.T) {
 	var p = Program{}
 	p.InitMemory("1,4,4,5,99,0")
-	var inst = parseInstruction(p.memory[0])
+	var inst = parseInstruction(int(p.memory[0]))
 	var got = addOp(&p, 0, inst)
 	if p.convertMemoryToString() != "1,4,4,5,99,198" {
 		t.Errorf("addOp = %s; want 1,4,4,5,99,198", p.convertMemoryToString())
@@ -233,7 +254,7 @@ func TestAddOp(t *testing.T) {
 	}
 
 	p.InitMemory("11101,4,4,5,99,0")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = addOp(&p, 0, inst)
 	if p.convertMemoryToString() != "11101,4,4,8,99,0" {
 		t.Errorf("addOp = %s; want 11101,4,4,8,99,0", p.convertMemoryToString())
@@ -246,7 +267,7 @@ func TestAddOp(t *testing.T) {
 func TestMulOp(t *testing.T) {
 	var p = Program{}
 	p.InitMemory("2,4,4,5,99,9801")
-	var inst = parseInstruction(p.memory[0])
+	var inst = parseInstruction(int(p.memory[0]))
 	var got = mulOp(&p, 0, inst)
 	if p.convertMemoryToString() != "2,4,4,5,99,9801" {
 		t.Errorf("addOp = %s; want 2,4,4,5,99,9801", p.convertMemoryToString())
@@ -256,7 +277,7 @@ func TestMulOp(t *testing.T) {
 	}
 
 	p.InitMemory("11102,4,4,5,99,0")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = mulOp(&p, 0, inst)
 	if p.convertMemoryToString() != "11102,4,4,16,99,0" {
 		t.Errorf("addOp = %s; want 11102,4,4,16,99,0", p.convertMemoryToString())
@@ -269,8 +290,8 @@ func TestMulOp(t *testing.T) {
 func TestStoreOp(t *testing.T) {
 	var p = Program{}
 	p.InitMemory("3,3,99,0")
-	p.input = []int{15}
-	var inst = parseInstruction(p.memory[0])
+	p.input = []int64{15}
+	var inst = parseInstruction(int(p.memory[0]))
 	var got = storeOp(&p, 0, inst)
 	if p.convertMemoryToString() != "3,3,99,15" {
 		t.Errorf("addOp = %s; want 3,3,99,15", p.convertMemoryToString())
@@ -283,8 +304,8 @@ func TestStoreOp(t *testing.T) {
 	}
 
 	p.InitMemory("103,3,99,0")
-	p.input = []int{15}
-	inst = parseInstruction(p.memory[0])
+	p.input = []int64{15}
+	inst = parseInstruction(int(p.memory[0]))
 	got = storeOp(&p, 0, inst)
 	if p.convertMemoryToString() != "103,15,99,0" {
 		t.Errorf("addOp = %s; want 103,15,99,0", p.convertMemoryToString())
@@ -300,10 +321,10 @@ func TestStoreOp(t *testing.T) {
 func TestLoadOp(t *testing.T) {
 	var p = Program{}
 	p.InitMemory("4,5,4,6,99,20,25")
-	var inst = parseInstruction(p.memory[0])
+	var inst = parseInstruction(int(p.memory[0]))
 	var got = loadOp(&p, 0, inst)
 	got = loadOp(&p, got, inst)
-	var expected = []int{20, 25}
+	var expected = []int64{20, 25}
 	if p.convertMemoryToString() != "4,5,4,6,99,20,25" {
 		t.Errorf("loadOp = %s; want 4,5,4,6,99,20,25", p.convertMemoryToString())
 	}
@@ -316,10 +337,10 @@ func TestLoadOp(t *testing.T) {
 
 	p.Reset()
 	p.InitMemory("104,5,104,6,99,20,25")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = loadOp(&p, 0, inst)
 	got = loadOp(&p, got, inst)
-	expected = []int{5, 6}
+	expected = []int64{5, 6}
 	if p.convertMemoryToString() != "104,5,104,6,99,20,25" {
 		t.Errorf("loadOp = %s; want 104,5,104,6,99,20,25", p.convertMemoryToString())
 	}
@@ -334,7 +355,7 @@ func TestLoadOp(t *testing.T) {
 func TestJnzOp(t *testing.T) {
 	var p = Program{}
 	p.InitMemory("5,4,5,99,1,4")
-	var inst = parseInstruction(p.memory[0])
+	var inst = parseInstruction(int(p.memory[0]))
 	var got = jnzOp(&p, 0, inst)
 	if p.convertMemoryToString() != "5,4,5,99,1,4" {
 		t.Errorf("p.memory = %s; want 5,4,5,99,1,4", p.convertMemoryToString())
@@ -345,7 +366,7 @@ func TestJnzOp(t *testing.T) {
 
 	p.Reset()
 	p.InitMemory("5,4,5,99,0,4")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = jnzOp(&p, 0, inst)
 	if p.convertMemoryToString() != "5,4,5,99,0,4" {
 		t.Errorf("p.memory = %s; want 5,4,5,99,0,4", p.convertMemoryToString())
@@ -356,7 +377,7 @@ func TestJnzOp(t *testing.T) {
 
 	p.Reset()
 	p.InitMemory("1105,1,4,99,0")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = jnzOp(&p, 0, inst)
 	if p.convertMemoryToString() != "1105,1,4,99,0" {
 		t.Errorf("p.memory = %s; want 1105,1,4,99,0", p.convertMemoryToString())
@@ -367,7 +388,7 @@ func TestJnzOp(t *testing.T) {
 
 	p.Reset()
 	p.InitMemory("1105,0,4,99,0")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = jnzOp(&p, 0, inst)
 	if p.convertMemoryToString() != "1105,0,4,99,0" {
 		t.Errorf("p.memory = %s; want 1105,0,4,99,0", p.convertMemoryToString())
@@ -380,7 +401,7 @@ func TestJnzOp(t *testing.T) {
 func TestJzOp(t *testing.T) {
 	var p = Program{}
 	p.InitMemory("6,4,5,99,1,4")
-	var inst = parseInstruction(p.memory[0])
+	var inst = parseInstruction(int(p.memory[0]))
 	var got = jzOp(&p, 0, inst)
 	if p.convertMemoryToString() != "6,4,5,99,1,4" {
 		t.Errorf("p.memory = %s; want 6,4,5,99,1,4", p.convertMemoryToString())
@@ -391,7 +412,7 @@ func TestJzOp(t *testing.T) {
 
 	p.Reset()
 	p.InitMemory("6,4,5,99,0,4")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = jzOp(&p, 0, inst)
 	if p.convertMemoryToString() != "6,4,5,99,0,4" {
 		t.Errorf("p.memory = %s; want 6,4,5,99,0,4", p.convertMemoryToString())
@@ -402,7 +423,7 @@ func TestJzOp(t *testing.T) {
 
 	p.Reset()
 	p.InitMemory("1106,1,4,99,0")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = jzOp(&p, 0, inst)
 	if p.convertMemoryToString() != "1106,1,4,99,0" {
 		t.Errorf("p.memory = %s; want 1106,1,4,99,0", p.convertMemoryToString())
@@ -413,7 +434,7 @@ func TestJzOp(t *testing.T) {
 
 	p.Reset()
 	p.InitMemory("1106,0,4,99,0")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = jzOp(&p, 0, inst)
 	if p.convertMemoryToString() != "1106,0,4,99,0" {
 		t.Errorf("p.memory = %s; want 1106,0,4,99,0", p.convertMemoryToString())
@@ -426,7 +447,7 @@ func TestJzOp(t *testing.T) {
 func TestLtOp(t *testing.T) {
 	var p = Program{}
 	p.InitMemory("7,5,6,7,99,1,2,0")
-	var inst = parseInstruction(p.memory[0])
+	var inst = parseInstruction(int(p.memory[0]))
 	var got = ltOp(&p, 0, inst)
 	if p.convertMemoryToString() != "7,5,6,7,99,1,2,1" {
 		t.Errorf("p.memory = %s; want 7,5,6,7,99,1,2,1", p.convertMemoryToString())
@@ -437,7 +458,7 @@ func TestLtOp(t *testing.T) {
 
 	p = Program{}
 	p.InitMemory("7,5,6,7,99,3,2,2")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = ltOp(&p, 0, inst)
 	if p.convertMemoryToString() != "7,5,6,7,99,3,2,0" {
 		t.Errorf("p.memory = %s; want 7,5,6,7,99,3,2,0", p.convertMemoryToString())
@@ -448,7 +469,7 @@ func TestLtOp(t *testing.T) {
 
 	p = Program{}
 	p.InitMemory("11107,1,2,2,99")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = ltOp(&p, 0, inst)
 	if p.convertMemoryToString() != "11107,1,2,1,99" {
 		t.Errorf("p.memory = %s; want 11107,1,2,1,99", p.convertMemoryToString())
@@ -459,7 +480,7 @@ func TestLtOp(t *testing.T) {
 
 	p = Program{}
 	p.InitMemory("11107,3,2,2,99")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = ltOp(&p, 0, inst)
 	if p.convertMemoryToString() != "11107,3,2,0,99" {
 		t.Errorf("p.memory = %s; want 11107,3,2,0,99", p.convertMemoryToString())
@@ -472,7 +493,7 @@ func TestLtOp(t *testing.T) {
 func TestEqOp(t *testing.T) {
 	var p = Program{}
 	p.InitMemory("8,5,6,7,99,1,2,2")
-	var inst = parseInstruction(p.memory[0])
+	var inst = parseInstruction(int(p.memory[0]))
 	var got = eqOp(&p, 0, inst)
 	if p.convertMemoryToString() != "8,5,6,7,99,1,2,0" {
 		t.Errorf("p.memory = %s; want 8,5,6,7,99,1,2,0", p.convertMemoryToString())
@@ -483,7 +504,7 @@ func TestEqOp(t *testing.T) {
 
 	p = Program{}
 	p.InitMemory("8,5,6,7,99,3,3,2")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = eqOp(&p, 0, inst)
 	if p.convertMemoryToString() != "8,5,6,7,99,3,3,1" {
 		t.Errorf("p.memory = %s; want 8,5,6,7,99,3,3,1", p.convertMemoryToString())
@@ -494,7 +515,7 @@ func TestEqOp(t *testing.T) {
 
 	p = Program{}
 	p.InitMemory("11108,5,6,7,99")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = eqOp(&p, 0, inst)
 	if p.convertMemoryToString() != "11108,5,6,0,99" {
 		t.Errorf("p.memory = %s; want 11108,5,6,0,99", p.convertMemoryToString())
@@ -505,13 +526,43 @@ func TestEqOp(t *testing.T) {
 
 	p = Program{}
 	p.InitMemory("11108,6,6,7,99")
-	inst = parseInstruction(p.memory[0])
+	inst = parseInstruction(int(p.memory[0]))
 	got = eqOp(&p, 0, inst)
 	if p.convertMemoryToString() != "11108,6,6,1,99" {
 		t.Errorf("p.memory = %s; want 11108,6,6,1,99", p.convertMemoryToString())
 	}
 	if got != 4 {
 		t.Errorf("ip = %d; want 4", got)
+	}
+}
+
+func TestAddRelBaseOp(t *testing.T) {
+	p := Program{}
+	p.InitMemory("109,4,204,1,99,20")
+	inst := parseInstruction(int(p.memory[0]))
+	got := addRelBaseOp(&p, 0, inst)
+	if p.relBase != 4 {
+		t.Errorf("p.relBase = %d; want 4", p.relBase)
+	}
+	if got != 2 {
+		t.Errorf("ip = %d; want 2", got)
+	}
+
+	p.Reset()
+	p.Run()
+	out := p.PopOutput()
+	if out != 20 {
+		t.Errorf("p.PopOutput = %d; want 20", out)
+	}
+}
+
+func TestExpandMemory(t *testing.T) {
+	p := Program{}
+	p.InitMemory("1101,2,3,6,99")
+	p.Run()
+	expectedMem := []int64{1101, 2, 3, 6, 99, 0, 5}
+	if !slicesEqual(p.memory, expectedMem) {
+		t.Errorf("p.memory = %v; want %v", p.memory, expectedMem)
 	}
 }
 
@@ -533,19 +584,19 @@ func TestParseInstruction(t *testing.T) {
 
 	got = parseInstruction(1001)
 	expected := []int{0, 1, 0}
-	if !slicesEqual(got.modeMask, expected) {
+	if !slicesEqualInt(got.modeMask, expected) {
 		t.Errorf("instruction.modeMask = %v; want {0, 1, 0}", got.modeMask)
 	}
 
 	got = parseInstruction(10001)
 	expected = []int{0, 0, 1}
-	if !slicesEqual(got.modeMask, expected) {
+	if !slicesEqualInt(got.modeMask, expected) {
 		t.Errorf("instruction.modeMask = %v; want {0, 0, 1}", got.modeMask)
 	}
 
 	got = parseInstruction(3)
 	expected = []int{0}
-	if !slicesEqual(got.modeMask, expected) {
+	if !slicesEqualInt(got.modeMask, expected) {
 		t.Errorf("instruction.modeMask = %v; want {0}", got.modeMask)
 	}
 }
@@ -560,7 +611,19 @@ func TestReset(t *testing.T) {
 	}
 }
 
-func slicesEqual(a, b []int) bool {
+func slicesEqual(a, b []int64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func slicesEqualInt(a, b []int) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -576,7 +639,7 @@ func (p Program) convertMemoryToString() string {
 	var strArray []string
 
 	for _, intItem := range p.memory {
-		strItem := strconv.Itoa(intItem)
+		strItem := strconv.FormatInt(intItem, 10)
 
 		strArray = append(strArray, strItem)
 	}
