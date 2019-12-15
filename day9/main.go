@@ -17,6 +17,11 @@ func main() {
 	p.Run()
 	boostKeycode := p.PopOutput()
 	fmt.Printf("Part 1: %d\n", boostKeycode)
+	p.Reset()
+	p.PushInput(2)
+	p.Run()
+	boostKeycode = p.PopOutput()
+	fmt.Printf("Part 2: %d\n", boostKeycode)
 }
 
 func readInput(filename string) string {
