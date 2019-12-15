@@ -3,6 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"log"
 	"os"
 	"strconv"
@@ -21,6 +24,82 @@ func main() {
 
 	checksum := getLayerChecksum(int(width), int(height), input)
 	fmt.Printf("Part 1: %d\n", checksum)
+
+	intArr := getIntArr(input)
+	layers := getLayers(int(width), int(height), intArr)
+	flatLayer := flattenLayers(int(width), int(height), layers)
+	printLayer(flatLayer)
+	convertLayerToPng(int(width), int(height), flatLayer, os.Args[4])
+}
+
+func printLayer(layer [][]int) {
+	for _, row := range layer {
+		for _, cell := range row {
+			if cell == 0 {
+				fmt.Print("*")
+			} else if cell == 1 {
+				fmt.Print("_")
+			} else if cell == 2 {
+				fmt.Print(" ")
+			}
+		}
+		fmt.Println()
+	}
+}
+
+func convertLayerToPng(width int, height int, layer [][]int, imagePath string) {
+
+	upLeft := image.Point{0, 0}
+	lowRight := image.Point{width, height}
+
+	img := image.NewRGBA(image.Rectangle{upLeft, lowRight})
+
+	// Colors are defined by Red, Green, Blue, Alpha uint8 values.
+	white := color.RGBA{0xff, 0xff, 0xff, 0xff}
+	black := color.RGBA{0, 0, 0, 0xff}
+	tranparent := color.RGBA{0, 0, 0, 0}
+
+	for y, row := range layer {
+		for x, cell := range row {
+			switch cell {
+			case 0:
+				img.Set(x, y, black)
+			case 1:
+				img.Set(x, y, white)
+			case 2:
+				img.Set(x, y, tranparent)
+			}
+
+		}
+	}
+
+	// Encode as PNG.
+	f, _ := os.Create(imagePath)
+	png.Encode(f, img)
+}
+
+func flattenLayers(width int, height int, layers [][][]int) [][]int {
+	var newLayer [][]int
+
+	//Copy first layer as is
+	firstLayer := layers[0]
+	for _, row := range firstLayer {
+		newRow := make([]int, len(row))
+		copy(newRow, row)
+		newLayer = append(newLayer, newRow)
+	}
+
+	for _, layer := range layers[1:] {
+		for i, row := range layer {
+			for j, cell := range row {
+				if newLayer[i][j] == 2 && cell != 2 {
+					newLayer[i][j] = cell
+				}
+			}
+		}
+	}
+
+	return newLayer
 }
 
 func getLayerChecksum(width int, height int, input string) int {
