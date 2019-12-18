@@ -28,6 +28,98 @@ func main() {
 	timeForward(moons, 1000)
 	systemEnergy := getSystemEnergy(moons)
 	fmt.Printf("Part 1: %d\n", systemEnergy)
+
+	numSteps := calcSystemPeriod(input)
+	fmt.Printf("Part 2: %d\n", numSteps)
+}
+
+/*
+getSystemStateCycle iterates through the system step at a time until moon positions equal some previous state.
+Returns number of steps required to get to the state
+*/
+func getSystemStateCycle(moons []*moon) int {
+	currStep := 0
+	initState := getSystemHash(moons)
+	currState := ""
+	isRunning := true
+
+	for isRunning {
+		timeStep(moons)
+		currStep++
+		currState = getSystemHash(moons)
+		if currState == initState {
+			isRunning = false
+		}
+	}
+
+	return currStep
+}
+
+func calcSystemPeriod(moonsInput []string) int {
+	moons := readMoons(moonsInput)
+	xPeriod := getPeriod(moons, "x")
+	moons = readMoons(moonsInput)
+	yPeriod := getPeriod(moons, "y")
+	moons = readMoons(moonsInput)
+	zPeriod := getPeriod(moons, "z")
+
+	return xPeriod * yPeriod * zPeriod
+}
+
+/*
+getPeriod calculates how long it takes for the system to get back to zero velocity on a specific axis
+*/
+func getPeriod(moons []*moon, coord string) int {
+	timeStep(moons)
+	currStep := 1
+
+	for !isVelocitiesZero(moons, coord) {
+		timeStep(moons)
+		currStep++
+	}
+
+	return currStep
+}
+
+/*
+isVelocitiesZero checks if system has all zero velocities for a particular axis
+*/
+func isVelocitiesZero(moons []*moon, coord string) bool {
+	for _, moon := range moons {
+		switch coord {
+		case "x":
+			if moon.velocity.x != 0 {
+				return false
+			}
+		case "y":
+			if moon.velocity.y != 0 {
+				return false
+			}
+		case "z":
+			if moon.velocity.z != 0 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+/*
+getSystemHash calculates hash value of the system by adding all positions and velocities together
+*/
+func getSystemHash(moons []*moon) string {
+	systemState := ""
+
+	for _, m := range moons {
+		systemState += strconv.Itoa(m.position.x)
+		systemState += strconv.Itoa(m.position.y)
+		systemState += strconv.Itoa(m.position.z)
+		systemState += strconv.Itoa(m.velocity.x)
+		systemState += strconv.Itoa(m.velocity.y)
+		systemState += strconv.Itoa(m.velocity.z)
+	}
+
+	return systemState
 }
 
 /*
