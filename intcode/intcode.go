@@ -321,6 +321,13 @@ func (p Program) GetOutputRegister() int64 {
 }
 
 /*
+SetMemoryValue will update selected memory location to a new value
+*/
+func (p *Program) SetMemoryValue(position int, value int64) {
+	p.memory[position] = value
+}
+
+/*
 Reset resets memory to original state
 */
 func (p *Program) Reset() {
