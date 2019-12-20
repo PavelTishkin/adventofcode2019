@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -12,7 +13,7 @@ import (
 
 type weightedElement struct {
 	element string
-	weight  int
+	weight  int64
 }
 
 type reaction struct {
@@ -21,23 +22,71 @@ type reaction struct {
 }
 
 type beaker struct {
+	reactions   []reaction
 	reactionMap map[string]reaction
-	leftovers   map[string]int
-	oreUsed     int
+	leftovers   map[string]int64
+	oreUsed     int64
 }
 
 func main() {
 	input := utils.ReadLines(os.Args[1])
 	oreUsed := calcOreForFuel(input)
 	fmt.Printf("Part 1: %d\n", oreUsed)
+
+	fuelProduced := calcFuelForOre(input)
+	fmt.Printf("Part 2: %d\n", fuelProduced)
 }
 
 /*
-calcOreForFuel calculates amount of ore required to produce one unit of fuel
+calcFuelForOre calculates amount of FUEL produced with 1000000000000 ORE
 */
-func calcOreForFuel(input []string) int {
+func calcFuelForOre(input []string) int64 {
 	reactions := parseReactions(input)
 	cleanBeaker := beaker{
+		reactions:   reactions,
+		reactionMap: createReactionMap(reactions),
+		leftovers:   initLeftovers(reactions),
+		oreUsed:     0,
+	}
+
+	oreLimit := int64(1000000000000)
+	left := int64(1)
+	right := oreLimit
+	middle := int64(math.Floor(float64(left+right) / 2.0))
+
+	for left <= right {
+		cleanBeaker.reset()
+		cleanBeaker.requestElement("FUEL", left)
+		oreLeft := cleanBeaker.oreUsed
+		cleanBeaker.reset()
+		cleanBeaker.requestElement("FUEL", right)
+		oreRight := cleanBeaker.oreUsed
+		if left == right-1 && oreLeft < oreLimit && oreRight > oreLimit {
+			return left
+		}
+
+		cleanBeaker.reset()
+		cleanBeaker.requestElement("FUEL", middle)
+		oreMiddle := cleanBeaker.oreUsed
+
+		if oreMiddle < oreLimit {
+			left = middle
+		} else {
+			right = middle
+		}
+		middle = int64(math.Floor(float64(left+right) / 2.0))
+	}
+
+	return 0
+}
+
+/*
+calcOreForFuel calculates amount of ORE required to produce one unit of FUEL
+*/
+func calcOreForFuel(input []string) int64 {
+	reactions := parseReactions(input)
+	cleanBeaker := beaker{
+		reactions:   reactions,
 		reactionMap: createReactionMap(reactions),
 		leftovers:   initLeftovers(reactions),
 		oreUsed:     0,
@@ -51,14 +100,11 @@ func calcOreForFuel(input []string) int {
 /*
 requestElement is a recursive function that takes name and quantity of an element and returns amount of ore required to produce it
 */
-func (b *beaker) requestElement(elementRequired string, quantityRequired int) {
-	for i := quantityRequired; i > 0; i-- {
-		if b.hasElement(elementRequired) {
-			b.useElement(elementRequired)
-		} else {
-			b.makeElement(elementRequired)
-			b.useElement(elementRequired)
-		}
+func (b *beaker) requestElement(elementRequired string, quantityRequired int64) {
+	stillRequired := b.useElement(elementRequired, quantityRequired)
+	if stillRequired > 0 {
+		b.makeElement(elementRequired, stillRequired)
+		b.useElement(elementRequired, stillRequired)
 	}
 }
 
@@ -66,37 +112,39 @@ func (b *beaker) requestElement(elementRequired string, quantityRequired int) {
 makeElement produces element (in multiples if required), based on reaction formula.
 If ORE is used, it is counted up
 */
-func (b *beaker) makeElement(elementRequired string) {
+func (b *beaker) makeElement(elementRequired string, quantityRequired int64) {
 	currReaction := b.reactionMap[elementRequired]
+	quantityProduced := int64(math.Ceil(float64(quantityRequired) / float64(currReaction.output.weight)))
 	for _, inputElement := range currReaction.input {
 		if inputElement.element == "ORE" {
-			b.oreUsed += inputElement.weight
+			b.oreUsed += inputElement.weight * quantityProduced
 		} else {
-			b.requestElement(inputElement.element, inputElement.weight)
+			b.requestElement(inputElement.element, inputElement.weight*quantityProduced)
 		}
 	}
-	b.leftovers[currReaction.output.element] += currReaction.output.weight
+	b.leftovers[currReaction.output.element] += currReaction.output.weight * quantityProduced
 }
 
 /*
-hasElement returns true if leftover has at least one element
+useElement reduces specific element leftover count by quantityRequired.
+If there are not enough elements, return amount of elements still required
 */
-func (b *beaker) hasElement(elementRequired string) bool {
-	return b.leftovers[elementRequired] > 0
-}
+func (b *beaker) useElement(elementRequired string, quantityRequired int64) int64 {
+	if b.leftovers[elementRequired] >= quantityRequired {
+		b.leftovers[elementRequired] -= quantityRequired
+		return 0
+	}
 
-/*
-useElement reduces specific element leftover count by 1
-*/
-func (b *beaker) useElement(elementRequired string) {
-	b.leftovers[elementRequired]--
+	stillRequired := quantityRequired - b.leftovers[elementRequired]
+	b.leftovers[elementRequired] = 0
+	return stillRequired
 }
 
 /*
 initLeftovers initialises map of how many leftover elements there currently are
 */
-func initLeftovers(reactions []reaction) map[string]int {
-	leftovers := make(map[string]int)
+func initLeftovers(reactions []reaction) map[string]int64 {
+	leftovers := make(map[string]int64)
 
 	leftovers["ORE"] = 0
 	for _, reaction := range reactions {
@@ -117,6 +165,12 @@ func createReactionMap(reactions []reaction) map[string]reaction {
 	}
 
 	return reactionMap
+}
+
+func (b *beaker) reset() {
+	b.leftovers = initLeftovers(b.reactions)
+	b.reactionMap = createReactionMap(b.reactions)
+	b.oreUsed = 0
 }
 
 /*
@@ -158,7 +212,7 @@ func parseElement(element string) weightedElement {
 
 	el := weightedElement{
 		element: elItems[1],
-		weight:  weight,
+		weight:  int64(weight),
 	}
 
 	return el
