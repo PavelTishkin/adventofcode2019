@@ -22,7 +22,7 @@ type droid struct {
 	flatPath       []*movementMap   // all movements maps in an array
 	visited        []*point         // list of points visited
 	foundTarget    bool             // true if target is found
-	targetPosition *point           // location of target
+	oxygenPosition *point           // location of oxygen
 }
 
 type movementMap struct {
@@ -38,13 +38,15 @@ func main() {
 	p := intcode.Program{}
 	p.InitMemory(input)
 
-	fmt.Printf("Part 1: %d\n", leastSteps(&p))
+	droid := initDroid(&p)
+	fmt.Printf("Part 1: %d\n", stepsToOxygen(droid))
+	fmt.Printf("Part 2: %d\n", timeToOxygen(droid))
 }
 
 /*
-leastSteps calculates least amount of steps required to take to find a target in a blind maze
+initDroid initialises a new droid
 */
-func leastSteps(p *intcode.Program) int {
+func initDroid(p *intcode.Program) *droid {
 	// Initialize droid
 	movementMapRoot := movementMap{location: &point{x: 0, y: 0}, distance: 0}
 	d := droid{
@@ -55,6 +57,14 @@ func leastSteps(p *intcode.Program) int {
 		foundTarget: false,
 	}
 	d.code.Run()
+
+	return &d
+}
+
+/*
+stepsToOxygen calculates least amount of steps required to take to find a target in a blind maze
+*/
+func stepsToOxygen(d *droid) int {
 
 	// Run search algorithm (assume no more than n steps are required)
 	for i := 0; i < 1000; i++ {
@@ -74,6 +84,34 @@ func leastSteps(p *intcode.Program) int {
 
 	log.Fatal("Could not find target...")
 	return 0
+}
+
+/*
+timeToOxygen calculates how much times it takes to fill up maze completely
+*/
+func timeToOxygen(d *droid) int {
+	d.moveToPoint(d.oxygenPosition)
+
+	// Reset initial location to oxygen point
+	movementMapRoot := movementMap{location: &point{x: d.location.x, y: d.location.y}, distance: 0}
+	d.rootPath = &movementMapRoot
+	d.flatPath = []*movementMap{&movementMapRoot}
+
+	timeToFill := 0
+	tryMoves := d.getAllMovesWithDistance(timeToFill)
+
+	for len(tryMoves) != 0 {
+		for _, tryMove := range tryMoves {
+			// First, navigate to the location of the move chosen
+			d.moveToPoint(tryMove.location)
+			// Take a step in every direction (will populate map of movements)
+			d.moveEveryDirection()
+		}
+		timeToFill++
+		tryMoves = d.getAllMovesWithDistance(timeToFill)
+	}
+
+	return timeToFill - 2
 }
 
 /*
@@ -271,7 +309,7 @@ func (d *droid) move(direction int) int {
 
 	if moveResult == 2 {
 		d.foundTarget = true
-		d.targetPosition = &point{x: d.location.x, y: d.location.y}
+		d.oxygenPosition = &point{x: d.location.x, y: d.location.y}
 	}
 
 	return moveResult
