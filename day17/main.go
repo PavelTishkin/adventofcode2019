@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"../intcode"
 	"../utils"
@@ -29,7 +30,7 @@ func main() {
 	//droid.printScafold()
 	droid.getIntersections()
 	fmt.Printf("Part 1: %d\n", droid.getIntersectionsSum())
-	// fmt.Printf("Part 2: %d\n", timeToOxygen(droid))
+	fmt.Printf("Part 2: %d\n", droid.navigateScaffolding())
 }
 
 /*
@@ -61,6 +62,19 @@ func (d *droid) drawScaffold() {
 	}
 
 	d.scaffoldMap = scaffoldMap
+}
+
+func (d *droid) navigateScaffolding() int64 {
+	d.p.Reset()
+	d.p.SetMemoryValue(0, 2)
+	main := createASCIIArrFromString("A,B,A,A,B,C,B,C,C,B")
+	a := createASCIIArrFromString("L12,R8,L6,R8,L6")
+	b := createASCIIArrFromString("R8,L12,L12,R8")
+	c := createASCIIArrFromString("L6,R6,L12")
+	d.inputInstructions(main, a, b, c)
+	d.p.Run()
+	output := d.p.GetOutput()
+	return output[len(output)-1]
 }
 
 /*
@@ -100,6 +114,39 @@ isNotEmpty returns true if cell at position x,y is not a '.'
 */
 func (d *droid) isNotEmpty(x, y int) bool {
 	return d.scaffoldMap[y][x] != '.'
+}
+
+/*
+inputInstructions provides instructions for the droid to navigate scaffolding
+*/
+func (d *droid) inputInstructions(main, a, b, c []int64) {
+	input := append(main, a...)
+	input = append(input, b...)
+	input = append(input, c...)
+	input = append(input, createASCIIArrFromString("n")...)
+	d.p.SetInput(input)
+}
+
+/*
+createASCIIArrFromString creates array of ascii characters ord numbers to pass to droid
+*/
+func createASCIIArrFromString(input string) []int64 {
+	var output []int64
+	inputArr := strings.Split(input, ",")
+
+	for _, letter := range inputArr {
+		output = append(output, int64(letter[0]))
+		if len(letter) > 1 {
+			output = append(output, int64(','))
+			for _, digit := range letter[1:] {
+				output = append(output, int64(digit))
+			}
+		}
+
+		output = append(output, int64(','))
+	}
+	output[len(output)-1] = 10
+	return output
 }
 
 /*
